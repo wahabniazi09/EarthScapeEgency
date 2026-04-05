@@ -1,0 +1,140 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+
+<h2 class="mb-3"><i class="fas fa-comment-alt"></i> Share Your Feedback</h2>
+<p class="text-muted mb-4">Help us improve the BlueCarbon AI platform</p>
+
+{% if message %}
+<div class="alert alert-success">
+    <i class="fas fa-check-circle"></i> {{ message }}
+</div>
+{% endif %}
+
+<div class="row">
+    
+    <!-- ================= FORM ================= -->
+    <div class="col-lg-7">
+        <div class="card p-4 shadow-sm">
+            <form method="POST">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label><i class="fas fa-user"></i> Full Name *</label>
+                    <input type="text" name="name" class="form-control" placeholder="John Doe" required>
+                </div>
+
+                <div class="mb-3">
+                    <label><i class="fas fa-envelope"></i> Email Address *</label>
+                    <input type="email" name="email" class="form-control" placeholder="john@example.com" required>
+                </div>
+
+                <div class="mb-3">
+                    <label><i class="fas fa-star"></i> Rating *</label>
+                    <div class="d-flex gap-3 mt-2">
+                        {% for i in "12345" %}
+                        <label class="rating-box">
+                            <input type="radio" name="rating" value="{{ i }}" required>
+                            <span>{{ i }} ★</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label><i class="fas fa-pen"></i> Comments</label>
+                    <textarea name="comments" class="form-control" rows="4" placeholder="Tell us your experience..."></textarea>
+                </div>
+
+                <button class="btn btn-primary w-100">
+                    <i class="fas fa-paper-plane"></i> Submit Feedback
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= SIDE INFO ================= -->
+    <div class="col-lg-5">
+        <div class="card p-4 bg-light shadow-sm">
+            <h5><i class="fas fa-heart text-danger"></i> Why Your Feedback Matters</h5>
+            <ul class="list-unstyled mt-3">
+                <li><i class="fas fa-check-circle text-primary"></i> Improve climate predictions</li>
+                <li><i class="fas fa-check-circle text-primary"></i> Add new features</li>
+                <li><i class="fas fa-check-circle text-primary"></i> Better UI/UX</li>
+                <li><i class="fas fa-check-circle text-primary"></i> Accurate analytics</li>
+            </ul>
+            <hr>
+            <p class="small text-muted">We review every feedback ❤️</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- ================= RECENT FEEDBACK ================= -->
+{% if recent_feedback %}
+<div class="card mt-4 p-3 shadow-sm">
+    <h5><i class="fas fa-history"></i> Recent Feedback</h5>
+
+    <div class="table-responsive mt-3">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>User</th>
+                    <th>Rating</th>
+                    <th>Comment</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fb in recent_feedback %}
+                <tr>
+                    <td>
+                        <strong>{{ fb.name }}</strong><br>
+                        <small class="text-muted">{{ fb.email }}</small>
+                    </td>
+
+                    <td>
+                        {% for i in "12345" %}
+                            {% if forloop.counter <= fb.rating %}
+                                ⭐
+                            {% else %}
+                                ☆
+                            {% endif %}
+                        {% endfor %}
+                    </td>
+
+                    <td>{{ fb.comments|default:"No comment"|truncatechars:60 }}</td>
+
+                    <td>{{ fb.created_at|date:"M d, Y H:i" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- ================= STYLE ================= -->
+<style>
+.rating-box {
+    cursor: pointer;
+}
+.rating-box input {
+    display: none;
+}
+.rating-box span {
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    transition: 0.3s;
+}
+.rating-box input:checked + span {
+    background: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+}
+.card {
+    border-radius: 12px;
+}
+</style>
+
+{% endblock %}

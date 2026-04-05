@@ -1,0 +1,565 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+<div class="dashboard-container">
+    <!-- Page Header -->
+    <div class="page-header mb-4">
+        <h2 class="page-title">
+            <i class="fas fa-tachometer-alt"></i> Climate Dashboard
+        </h2>
+        <p class="text-muted">Temperature anomaly analysis with 1951-1980 baseline</p>
+    </div>
+
+    <!-- Filter Form - Improved spacing -->
+    <div class="filter-card mb-4">
+        <form method="GET" class="filter-form">
+            <div class="row g-3">
+                <div class="col-12 col-md-4">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-chart-line"></i> Indicator
+                        </label>
+                        <select name="indicator" class="form-select" disabled>
+                            <option selected>🌡️ Temperature Anomaly (1951-1980 Baseline)</option>
+                        </select>
+                        <small class="form-hint">Temperature change relative to 1951-1980 baseline</small>
+                    </div>
+                </div>
+                <div class="col-12 col-md-3">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-flag"></i> Country / Region
+                        </label>
+                        <select name="country" class="form-select" onchange="this.form.submit()">
+                            <option value="Global" {% if selected_country == 'Global' %}selected{% endif %}>
+                                🌎 Global (All Countries)
+                            </option>
+                            {% for c in countries %}
+                                {% if c != 'Global' %}
+                                <option value="{{ c }}" {% if c == selected_country %}selected{% endif %}>
+                                    📍 {{ c }}
+                                </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-calendar-alt"></i> Start Year
+                        </label>
+                        <input type="number" name="start_year" value="{{ start_year }}" class="form-control">
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <div class="form-group">
+                        <label class="form-label">
+                            <i class="fas fa-calendar-check"></i> End Year
+                        </label>
+                        <input type="number" name="end_year" value="{{ end_year }}" class="form-control">
+                    </div>
+                </div>
+                <div class="col-12 col-md-1">
+                    <div class="form-group">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-sync-alt"></i> Update
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Stats Cards Grid -->
+    <div class="stats-grid mb-4">
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h5 class="stat-label">Total Records</h5>
+                        <p class="stat-value">{{ records }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h5 class="stat-label">Average Anomaly</h5>
+                        <p class="stat-value">{{ avg_value }}°C</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-globe"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h5 class="stat-label">Region</h5>
+                        <p class="stat-value-sm">{{ selected_country }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-calendar"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h5 class="stat-label">Time Range</h5>
+                        <p class="stat-value-sm">{{ start_year }} - {{ end_year }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart Section -->
+    {% if co2_chart %}
+    <div class="chart-card mb-4">
+        <div class="card-header-custom">
+            <h4 class="card-title">
+                <i class="fas fa-chart-line"></i> Temperature Anomaly Trend
+            </h4>
+            <span class="badge-custom">
+                <i class="fas fa-chart-simple"></i> {{ selected_country }}
+            </span>
+        </div>
+        <div class="chart-wrapper">
+            <img src="data:image/png;base64,{{ co2_chart }}" class="chart-image" alt="Temperature Trend Chart">
+        </div>
+        <div class="chart-info">
+            <i class="fas fa-info-circle"></i>
+            <strong>Temperature Anomaly:</strong> Values represent temperature change (°C) relative to the 1951-1980 baseline.
+            <span class="info-highlight">Positive values indicate warming, negative values indicate cooling.</span>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert-card">
+        <div class="alert-content">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h5>No Data Available</h5>
+            <p>No temperature data found for the selected criteria. Please try different filters.</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Statistics Table -->
+    {% if indicator_wise_data %}
+    <div class="data-card mb-4">
+        <h4 class="card-title">
+            <i class="fas fa-chart-pie"></i> Temperature Statistics
+        </h4>
+        <div class="table-wrapper">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Indicator</th>
+                        <th>Average (°C)</th>
+                        <th>Min (°C)</th>
+                        <th>Max (°C)</th>
+                        <th>Trend</th>
+                        <th>Unit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ind in indicator_wise_data %}
+                    <tr>
+                        <td class="indicator-name">🌡️ {{ ind.name }}</td>
+                        <td class="fw-bold text-primary">{{ ind.avg }}°C</td>
+                        <td>{{ ind.min }}°C</td>
+                        <td>{{ ind.max }}°C</td>
+                        <td>
+                            {% if ind.trend > 0 %}
+                                <span class="trend-up"><i class="fas fa-arrow-up"></i> +{{ ind.trend }}%</span>
+                            {% elif ind.trend < 0 %}
+                                <span class="trend-down"><i class="fas fa-arrow-down"></i> {{ ind.trend }}%</span>
+                            {% else %}
+                                <span class="trend-stable"><i class="fas fa-minus"></i> Stable</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ ind.unit }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Detailed Data Table -->
+    {% if table_data %}
+    <div class="data-card">
+        <h4 class="card-title">
+            <i class="fas fa-table"></i> Detailed Temperature Data
+        </h4>
+        <div class="table-wrapper">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Year</th>
+                        <th>Temperature Anomaly (°C)</th>
+                        <th>Country</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in table_data %}
+                    <tr>
+                        <td class="year-cell"><strong>{{ row.Year }}</strong></td>
+                        <td class="{% if row.Value > 0 %}temp-warm{% else %}temp-cool{% endif %}">
+                            {% if row.Value > 0 %}+{% endif %}{{ row.Value }}°C
+                        </td>
+                        <td>{{ row.Country }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="table-footer">
+            <i class="fas fa-chart-simple"></i> Showing {{ table_data|length }} of {{ records }} records
+        </p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+/* Dashboard Container */
+.dashboard-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Page Header */
+.page-header {
+    margin-bottom: 1.5rem;
+}
+.page-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #0c4a6e;
+    margin-bottom: 0.25rem;
+}
+.page-title i {
+    color: #3b82f6;
+    margin-right: 10px;
+}
+
+/* Filter Card */
+.filter-card {
+    background: white;
+    border-radius: 24px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    border: 1px solid #eef2ff;
+}
+.filter-form .form-group {
+    margin-bottom: 0;
+}
+.filter-form .form-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #1e3a8a;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+.filter-form .form-hint {
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+    display: block;
+}
+.filter-form .form-select,
+.filter-form .form-control {
+    border-radius: 16px;
+    border: 1.5px solid #e2e8f0;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+}
+.filter-form .btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+/* Stats Cards */
+.stats-grid .stat-card {
+    background: white;
+    border-radius: 20px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    border: 1px solid #eef2ff;
+    transition: all 0.3s ease;
+    height: 100%;
+}
+.stats-grid .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.1);
+    border-color: #bfdbfe;
+}
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.stat-icon i {
+    font-size: 1.5rem;
+    color: #3b82f6;
+}
+.stat-content {
+    flex: 1;
+}
+.stat-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #0c4a6e;
+    margin-bottom: 0;
+    line-height: 1.2;
+}
+.stat-value-sm {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0c4a6e;
+    margin-bottom: 0;
+}
+
+/* Chart Card */
+.chart-card {
+    background: white;
+    border-radius: 24px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    border: 1px solid #eef2ff;
+}
+.card-header-custom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+.card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0c4a6e;
+    margin: 0;
+}
+.card-title i {
+    color: #3b82f6;
+    margin-right: 8px;
+}
+.badge-custom {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    color: #1e40af;
+    padding: 0.35rem 1rem;
+    border-radius: 40px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.badge-custom i {
+    margin-right: 4px;
+}
+.chart-wrapper {
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+.chart-image {
+    width: 100%;
+    max-height: 450px;
+    object-fit: contain;
+    border-radius: 16px;
+}
+.chart-info {
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 16px;
+    font-size: 0.85rem;
+    color: #475569;
+    border-left: 4px solid #3b82f6;
+}
+.chart-info i {
+    color: #3b82f6;
+    margin-right: 8px;
+}
+.info-highlight {
+    display: inline-block;
+    margin-top: 6px;
+    color: #0c4a6e;
+    font-weight: 500;
+}
+
+/* Alert Card */
+.alert-card {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 20px;
+    padding: 2rem;
+    text-align: center;
+}
+.alert-content i {
+    font-size: 2.5rem;
+    color: #f59e0b;
+    margin-bottom: 1rem;
+}
+.alert-content h5 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+.alert-content p {
+    color: #78716c;
+    margin-bottom: 0;
+}
+
+/* Data Cards */
+.data-card {
+    background: white;
+    border-radius: 24px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    border: 1px solid #eef2ff;
+}
+.table-wrapper {
+    overflow-x: auto;
+    margin-top: 1rem;
+}
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.custom-table thead th {
+    background: #f8fafc;
+    color: #1e3a8a;
+    font-weight: 600;
+    padding: 0.9rem 1rem;
+    border-bottom: 2px solid #e2e8f0;
+    text-align: left;
+}
+.custom-table tbody td {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+}
+.custom-table tbody tr:hover {
+    background: #f8fafc;
+}
+.indicator-name {
+    font-weight: 500;
+    color: #0c4a6e;
+}
+.trend-up {
+    color: #dc2626;
+    font-weight: 500;
+}
+.trend-down {
+    color: #10b981;
+    font-weight: 500;
+}
+.trend-stable {
+    color: #6c757d;
+    font-weight: 500;
+}
+.year-cell {
+    font-weight: 600;
+    color: #0c4a6e;
+}
+.temp-warm {
+    color: #dc2626;
+    font-weight: 600;
+}
+.temp-cool {
+    color: #3b82f6;
+    font-weight: 600;
+}
+.table-footer {
+    margin-top: 1rem;
+    font-size: 0.75rem;
+    color: #6c757d;
+    text-align: right;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .page-title {
+        font-size: 1.35rem;
+    }
+    .filter-card {
+        padding: 1rem;
+    }
+    .filter-form .btn {
+        margin-top: 0.5rem;
+    }
+    .chart-card,
+    .data-card {
+        padding: 1rem;
+    }
+    .card-header-custom {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .stat-value {
+        font-size: 1.4rem;
+    }
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+    }
+    .stat-icon i {
+        font-size: 1.2rem;
+    }
+    .custom-table thead th,
+    .custom-table tbody td {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.75rem;
+    }
+    .chart-info {
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .stats-grid .stat-card {
+        padding: 0.8rem;
+    }
+    .stat-value {
+        font-size: 1.2rem;
+    }
+    .stat-value-sm {
+        font-size: 0.85rem;
+    }
+    .stat-label {
+        font-size: 0.65rem;
+    }
+    .stat-icon {
+        width: 36px;
+        height: 36px;
+    }
+    .card-title {
+        font-size: 1rem;
+    }
+}
+</style>
+{% endblock %}

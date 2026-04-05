@@ -1,0 +1,716 @@
+{% extends 'dashboard/base.html' %}
+{% block content %}
+<div class="analytics-container">
+    <!-- Page Header -->
+    <div class="page-header mb-4">
+        <h2 class="page-title">
+            <i class="fas fa-chart-scatter"></i> Climate Analytics Hub
+        </h2>
+        <p class="text-muted">Analyze temperature anomaly correlations between different regions</p>
+    </div>
+
+    <!-- Main Analysis Card -->
+    <div class="analysis-card mb-4">
+        <div class="card-header-custom">
+            <h4 class="card-title">
+                <i class="fas fa-chart-line"></i> Temperature Anomaly Correlation Analysis
+            </h4>
+            <span class="badge-custom">
+                <i class="fas fa-info-circle"></i> Pearson Correlation
+            </span>
+        </div>
+        <p class="card-subtitle">Add regions one by one to see the correlation matrix</p>
+
+        <!-- Messages -->
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert-message alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">
+                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                {{ message }}
+                <button type="button" class="close-btn" data-bs-dismiss="alert">&times;</button>
+            </div>
+            {% endfor %}
+        {% endif %}
+
+        {% if selected_regions %}
+            {{ selected_regions|json_script:"initial-regions-data" }}
+        {% endif %}
+
+        <!-- Region Selection Form -->
+        <form method="GET" action="" id="correlationForm" class="region-form">
+            <div class="form-section">
+                <label class="section-label">
+                    <i class="fas fa-globe"></i> Selected Regions
+                </label>
+                <div id="selectedRegionsContainer" class="regions-container"></div>
+
+                <div class="add-region-group">
+                    <select id="regionSelect" class="region-select">
+                        <option value="">-- Select a region --</option>
+                        <option value="Global">🌎 Global (World Average)</option>
+                        <option value="USA">🇺🇸 United States</option>
+                        <option value="China">🇨🇳 China</option>
+                        <option value="India">🇮🇳 India</option>
+                        <option value="Germany">🇩🇪 Germany</option>
+                        <option value="Brazil">🇧🇷 Brazil</option>
+                        <option value="United Kingdom">🇬🇧 United Kingdom</option>
+                        <option value="France">🇫🇷 France</option>
+                        <option value="Japan">🇯🇵 Japan</option>
+                        <option value="Canada">🇨🇦 Canada</option>
+                        <option value="Australia">🇦🇺 Australia</option>
+                        <option value="Russia">🇷🇺 Russia</option>
+                        <option value="South Africa">🇿🇦 South Africa</option>
+                        <option value="Mexico">🇲🇽 Mexico</option>
+                        <option value="Indonesia">🇮🇩 Indonesia</option>
+                        <option value="Pakistan">🇵🇰 Pakistan</option>
+                    </select>
+                    <button type="button" id="addRegionBtn" class="btn-add">
+                        <i class="fas fa-plus"></i> Add Region
+                    </button>
+                </div>
+                <small class="form-hint">
+                    <i class="fas fa-info-circle"></i> Click + to add regions one by one
+                </small>
+            </div>
+
+            <div class="filters-section">
+                <div class="filter-group">
+                    <label class="filter-label">
+                        <i class="fas fa-calendar-alt"></i> Start Year
+                    </label>
+                    <input type="number" name="start_year" id="start_year" class="filter-input" value="{{ start_year|default:1961 }}">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">
+                        <i class="fas fa-calendar-check"></i> End Year
+                    </label>
+                    <input type="number" name="end_year" id="end_year" class="filter-input" value="{{ end_year|default:2022 }}">
+                </div>
+                <div class="filter-group">
+                    <button type="submit" class="btn-update">
+                        <i class="fas fa-sync-alt"></i> Update Correlation
+                    </button>
+                </div>
+                <div class="filter-group">
+                    <button type="button" id="clearAllBtn" class="btn-clear">
+                        <i class="fas fa-trash-alt"></i> Clear All
+                    </button>
+                </div>
+            </div>
+            <input type="hidden" name="regions" id="regionsInput">
+        </form>
+
+        <!-- Chart / Heatmap Display -->
+        <div class="chart-display">
+            {% if heatmap %}
+            <div class="heatmap-wrapper">
+                <img src="data:image/png;base64,{{ heatmap }}" class="heatmap-image" alt="Correlation Heatmap">
+            </div>
+            {% elif selected_regions|length >= 2 %}
+            <div class="info-message">
+                <i class="fas fa-info-circle"></i>
+                <h5>Ready to Analyze</h5>
+                <p>Click "Update Correlation" to see the heatmap</p>
+            </div>
+            {% else %}
+            <div class="warning-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h5>Add at least 2 regions</h5>
+                <p>Use the dropdown and + button to add regions for correlation analysis</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Statistical Summary Card -->
+    <div class="stats-card">
+        <div class="card-header-custom">
+            <h4 class="card-title">
+                <i class="fas fa-chart-pie"></i> Statistical Summary by Decade
+            </h4>
+            <span class="badge-custom">
+                <i class="fas fa-chart-line"></i> 1961-2022
+            </span>
+        </div>
+        <div class="table-wrapper">
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>Decade</th>
+                        <th>Global Avg (°C)</th>
+                        <th>Min (°C)</th>
+                        <th>Max (°C)</th>
+                        <th>Warming Rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="decade-cell">1961-1970</td>
+                        <td class="temp-neutral">-0.12</td>
+                        <td class="temp-cool">-0.45</td>
+                        <td class="temp-warm">0.23</td>
+                        <td class="trend-cool"><i class="fas fa-arrow-down"></i> -0.05 °C/decade</td>
+                    </tr>
+                    <tr>
+                        <td class="decade-cell">1971-1980</td>
+                        <td class="temp-neutral">-0.08</td>
+                        <td class="temp-cool">-0.38</td>
+                        <td class="temp-warm">0.31</td>
+                        <td class="trend-cool"><i class="fas fa-arrow-down"></i> -0.02 °C/decade</td>
+                    </tr>
+                    <tr>
+                        <td class="decade-cell">1981-1990</td>
+                        <td class="temp-warm">0.05</td>
+                        <td class="temp-cool">-0.28</td>
+                        <td class="temp-warm">0.48</td>
+                        <td class="trend-warm"><i class="fas fa-arrow-up"></i> +0.13 °C/decade</td>
+                    </tr>
+                    <tr>
+                        <td class="decade-cell">1991-2000</td>
+                        <td class="temp-warm">0.22</td>
+                        <td class="temp-cool">-0.15</td>
+                        <td class="temp-warm">0.62</td>
+                        <td class="trend-warm"><i class="fas fa-arrow-up"></i> +0.17 °C/decade</td>
+                    </tr>
+                    <tr>
+                        <td class="decade-cell">2001-2010</td>
+                        <td class="temp-warm">0.48</td>
+                        <td class="temp-warm">0.12</td>
+                        <td class="temp-warm">0.89</td>
+                        <td class="trend-warm"><i class="fas fa-arrow-up"></i> +0.26 °C/decade</td>
+                    </tr>
+                    <tr>
+                        <td class="decade-cell">2011-2022</td>
+                        <td class="temp-warm">0.85</td>
+                        <td class="temp-warm">0.45</td>
+                        <td class="temp-warm">1.28</td>
+                        <td class="trend-warm"><i class="fas fa-arrow-up"></i> +0.37 °C/decade</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Analytics Container */
+.analytics-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Page Header */
+.page-header {
+    margin-bottom: 1.5rem;
+}
+.page-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #0c4a6e;
+    margin-bottom: 0.25rem;
+}
+.page-title i {
+    color: #3b82f6;
+    margin-right: 10px;
+}
+
+/* Analysis Card */
+.analysis-card {
+    background: white;
+    border-radius: 24px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    border: 1px solid #eef2ff;
+}
+.card-header-custom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0c4a6e;
+    margin: 0;
+}
+.card-title i {
+    color: #3b82f6;
+    margin-right: 8px;
+}
+.card-subtitle {
+    color: #64748b;
+    font-size: 0.85rem;
+    margin-bottom: 1.25rem;
+}
+.badge-custom {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    color: #1e40af;
+    padding: 0.35rem 1rem;
+    border-radius: 40px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+.badge-custom i {
+    margin-right: 4px;
+}
+
+/* Alert Messages */
+.alert-message {
+    padding: 0.85rem 1rem;
+    border-radius: 16px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    position: relative;
+}
+.alert-success {
+    background: #ecfdf5;
+    border-left: 4px solid #10b981;
+    color: #065f46;
+}
+.alert-warning {
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+    color: #92400e;
+}
+.alert-danger {
+    background: #fef2f2;
+    border-left: 4px solid #ef4444;
+    color: #991b1b;
+}
+.alert-info {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    color: #1e40af;
+}
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    margin-left: auto;
+    color: inherit;
+    opacity: 0.6;
+    padding: 0 8px;
+}
+.close-btn:hover {
+    opacity: 1;
+}
+
+/* Form Sections */
+.region-form {
+    margin-top: 0.5rem;
+}
+.form-section {
+    margin-bottom: 1.5rem;
+}
+.section-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1e3a8a;
+    margin-bottom: 0.75rem;
+    display: block;
+}
+.regions-container {
+    min-height: 80px;
+    background: #fafcff;
+    border-radius: 16px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    border: 1px dashed #cbd5e1;
+}
+.add-region-group {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+.region-select {
+    flex: 1;
+    padding: 0.7rem 1rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 16px;
+    font-size: 0.9rem;
+    background: white;
+}
+.region-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+.btn-add {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border: none;
+    border-radius: 16px;
+    padding: 0.7rem 1.5rem;
+    color: white;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.btn-add:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.form-hint {
+    font-size: 0.7rem;
+    color: #6c757d;
+}
+.form-hint i {
+    margin-right: 4px;
+}
+
+/* Filters Section */
+.filters-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #eef2ff;
+}
+.filter-group {
+    flex: 1;
+    min-width: 120px;
+}
+.filter-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #1e3a8a;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+.filter-input {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 14px;
+    font-size: 0.85rem;
+}
+.filter-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+.btn-update, .btn-clear {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border-radius: 14px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn-update {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border: none;
+    color: white;
+}
+.btn-update:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+.btn-clear {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+}
+.btn-clear:hover {
+    background: #e2e8f0;
+    transform: translateY(-1px);
+}
+
+/* Selected Regions Badges */
+.selected-region-badge {
+    display: inline-flex;
+    align-items: center;
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    color: #1e40af;
+    padding: 6px 14px;
+    border-radius: 40px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-right: 10px;
+    margin-bottom: 8px;
+    border: 1px solid #bfdbfe;
+}
+.remove-region {
+    background: none;
+    border: none;
+    color: #ef4444;
+    margin-left: 10px;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 4px;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+.remove-region:hover {
+    color: #dc2626;
+    transform: scale(1.2);
+}
+.plus-sign {
+    font-size: 18px;
+    font-weight: bold;
+    color: #3b82f6;
+    margin: 0 6px 8px 6px;
+    display: inline-block;
+}
+
+/* Chart Display */
+.chart-display {
+    margin-top: 1rem;
+}
+.heatmap-wrapper {
+    overflow-x: auto;
+    text-align: center;
+}
+.heatmap-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+.info-message, .warning-message {
+    text-align: center;
+    padding: 2rem;
+    border-radius: 20px;
+}
+.info-message {
+    background: #eff6ff;
+    color: #1e40af;
+}
+.warning-message {
+    background: #fffbeb;
+    color: #92400e;
+}
+.info-message i, .warning-message i {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+    display: inline-block;
+}
+.info-message h5, .warning-message h5 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+.info-message p, .warning-message p {
+    font-size: 0.85rem;
+    margin-bottom: 0;
+}
+
+/* Stats Card */
+.stats-card {
+    background: white;
+    border-radius: 24px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+    border: 1px solid #eef2ff;
+}
+.table-wrapper {
+    overflow-x: auto;
+    margin-top: 1rem;
+}
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.stats-table thead th {
+    background: #f8fafc;
+    color: #1e3a8a;
+    font-weight: 600;
+    padding: 0.9rem 1rem;
+    border-bottom: 2px solid #e2e8f0;
+    text-align: left;
+}
+.stats-table tbody td {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+.stats-table tbody tr:hover {
+    background: #f8fafc;
+}
+.decade-cell {
+    font-weight: 600;
+    color: #0c4a6e;
+}
+.temp-warm {
+    color: #dc2626;
+    font-weight: 500;
+}
+.temp-cool {
+    color: #3b82f6;
+    font-weight: 500;
+}
+.temp-neutral {
+    color: #64748b;
+}
+.trend-warm {
+    color: #dc2626;
+    font-weight: 500;
+}
+.trend-cool {
+    color: #10b981;
+    font-weight: 500;
+}
+.trend-warm i, .trend-cool i {
+    margin-right: 4px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .page-title {
+        font-size: 1.35rem;
+    }
+    .analysis-card, .stats-card {
+        padding: 1rem;
+    }
+    .card-header-custom {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .filters-section {
+        flex-direction: column;
+    }
+    .filter-group {
+        width: 100%;
+    }
+    .add-region-group {
+        flex-direction: column;
+    }
+    .btn-add {
+        width: 100%;
+    }
+    .selected-region-badge {
+        font-size: 11px;
+        padding: 4px 10px;
+    }
+    .stats-table thead th,
+    .stats-table tbody td {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.7rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .stats-table thead th,
+    .stats-table tbody td {
+        padding: 0.5rem 0.6rem;
+        font-size: 0.65rem;
+    }
+    .card-title {
+        font-size: 1rem;
+    }
+    .info-message, .warning-message {
+        padding: 1rem;
+    }
+}
+</style>
+
+<script>
+let selectedRegions = [];
+
+function loadInitialRegions() {
+    const script = document.getElementById("initial-regions-data");
+    if (script) {
+        try {
+            selectedRegions = JSON.parse(script.textContent);
+        } catch(e) {
+            selectedRegions = [];
+        }
+    } else {
+        const inp = document.getElementById("regionsInput");
+        if (inp && inp.value) selectedRegions = inp.value.split(",").filter(r => r);
+    }
+    updateDisplay();
+}
+
+function updateDisplay() {
+    const container = document.getElementById("selectedRegionsContainer");
+    const input = document.getElementById("regionsInput");
+    if (!container || !input) return;
+    input.value = selectedRegions.join(",");
+    
+    if (selectedRegions.length === 0) {
+        container.innerHTML = '<div class="alert alert-secondary text-center py-3" style="background:#f8fafc; border-radius:12px;"><i class="fas fa-info-circle fa-2x mb-2 d-block" style="color:#94a3b8;"></i><strong style="color:#475569;">No regions selected</strong><br><span style="font-size:12px; color:#64748b;">Use dropdown and + button to add regions.</span></div>';
+        return;
+    }
+    
+    let html = '<div class="d-flex flex-wrap align-items-center">';
+    const emojiMap = {
+        Global: "🌎", USA: "🇺🇸", China: "🇨🇳", India: "🇮🇳",
+        Germany: "🇩🇪", Brazil: "🇧🇷", "United Kingdom": "🇬🇧",
+        France: "🇫🇷", Japan: "🇯🇵", Canada: "🇨🇦", Australia: "🇦🇺",
+        Russia: "🇷🇺", "South Africa": "🇿🇦", Mexico: "🇲🇽",
+        Indonesia: "🇮🇩", Pakistan: "🇵🇰"
+    };
+    
+    selectedRegions.forEach((r, i) => {
+        const emoji = emojiMap[r] || "📍";
+        html += `<div class="selected-region-badge"><i class="fas fa-map-marker-alt"></i> ${emoji} ${r}<button type="button" class="remove-region" onclick="removeRegion('${r.replace(/'/g, "\\'")}')"><i class="fas fa-times-circle"></i></button></div>`;
+        if (i < selectedRegions.length - 1) html += '<span class="plus-sign">+</span>';
+    });
+    
+    if (selectedRegions.length < 2) {
+        html += `<div class="alert alert-warning mt-3 py-2" style="background:#fffbeb; border-radius:12px; width:100%;"><i class="fas fa-exclamation-triangle" style="color:#f59e0b;"></i> <span style="color:#92400e;">Add at least 2 regions for correlation</span></div>`;
+    } else {
+        html += `<div class="alert alert-success mt-3 py-2" style="background:#ecfdf5; border-radius:12px; width:100%;"><i class="fas fa-check-circle" style="color:#10b981;"></i> <span style="color:#065f46;">${selectedRegions.length} regions selected. Click "Update Correlation" to see heatmap.</span></div>`;
+    }
+    container.innerHTML = html;
+}
+
+function addRegion() {
+    const sel = document.getElementById("regionSelect");
+    const val = sel.value;
+    if (!val) {
+        alert("Please select a region first");
+        return;
+    }
+    if (selectedRegions.includes(val)) {
+        alert(`${val} is already selected`);
+        return;
+    }
+    selectedRegions.push(val);
+    sel.value = "";
+    updateDisplay();
+}
+
+function removeRegion(r) {
+    const idx = selectedRegions.indexOf(r);
+    if (idx > -1) {
+        selectedRegions.splice(idx, 1);
+        updateDisplay();
+    }
+}
+
+function clearAll() {
+    if (selectedRegions.length > 0 && confirm("Remove all regions?")) {
+        selectedRegions = [];
+        updateDisplay();
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadInitialRegions();
+    document.getElementById("addRegionBtn")?.addEventListener("click", (e) => {
+        e.preventDefault();
+        addRegion();
+    });
+    document.getElementById("clearAllBtn")?.addEventListener("click", (e) => {
+        e.preventDefault();
+        clearAll();
+    });
+    document.getElementById("regionSelect")?.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            addRegion();
+        }
+    });
+});
+</script>
+{% endblock %}
