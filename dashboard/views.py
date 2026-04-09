@@ -1,5 +1,3 @@
-# views.py
-
 import matplotlib
 matplotlib.use('Agg')
 import pandas as pd
@@ -13,7 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth.models import User
 from sklearn.linear_model import LinearRegression
-from .models import Feedback, UserProfile
+from .models import *
 from .utils import load_data
 from .ml_model import train_model
 import csv
@@ -26,17 +24,26 @@ def register_view(request):
         username = request.POST.get("username")
         email = request.POST.get("email")
         password = request.POST.get("password")
-        role = request.POST.get("role", "analyst")
+
+        # 🔒 FORCE ROLE (NO FRONTEND TRUST)
+        role = "analyst"
 
         if User.objects.filter(username=username).exists():
             messages.error(request, "Username already exists")
         else:
-            user = User.objects.create_user(username=username, email=email, password=password)
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password
+            )
+
+            # create profile with FIXED role
             UserProfile.objects.create(user=user, role=role)
+
             messages.success(request, "Account created! Please login.")
             return redirect('login')
 
-    return render(request, "dashboard/register.html")
+    return render(request, "authentication/register.html")
 
 
 # ---------------- LOGIN ----------------
@@ -56,13 +63,13 @@ def login_view(request):
             return redirect('dashboard')
         else:
             messages.error(request, "Invalid username or password")
-    return render(request, "dashboard/login.html")
+    return render(request, "authentication/login.html")
 
 
 # ---------------- LOGOUT ----------------
 def logout_view(request):
     logout(request)
-    return redirect('login')
+    return redirect('dashboard')
 
 
 # ---------------- HELPER - Enhanced for Blue Theme ----------------
@@ -212,7 +219,6 @@ def dashboard(request):
 
 
 # ---------------- REGIONS - Updated for Temperature Data ----------------
-@login_required(login_url='login')
 def regions(request):
     df = load_data()
     
@@ -277,7 +283,6 @@ def regions(request):
 
 
 # ---------------- PREDICTIONS - Updated for Temperature Data ----------------
-@login_required(login_url='login')
 def predictions(request):
     df = load_data()
     
@@ -384,7 +389,6 @@ def predictions(request):
         "selected_country": country
     })
 
-@login_required(login_url='login')
 def analytics(request):
     df = load_data()
 
@@ -542,12 +546,10 @@ def analytics(request):
         "available_countries": available_countries
     })
 
-# ---------------- FEEDBACK - Enhanced ----------------
-from .models import Feedback
-
 
 @login_required(login_url='login')
 def feedback(request):
+    
 
     # 🔥 Only analyst allowed
     if request.session.get('role') != 'analyst':
@@ -591,6 +593,6 @@ def feedback(request):
         "message": message,
         "recent_feedback": recent_feedback
     })
-# ---------------- UNAUTHORIZED PAGE ----------------
-def unauthorized_view(request):
-    return render(request, "dashboard/unauthorized.html")
+    
+    
+    
